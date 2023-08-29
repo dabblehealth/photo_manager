@@ -115,8 +115,15 @@
     } else if ([call.method isEqualToString:@"log"]) {
         PMLogUtils.sharedInstance.isLog = [call.arguments boolValue];
         [handler reply:@1];
+    } else if (manager.isAuth) {
+        [self onAuth:call result:result];
+    } else if (onlyAdd && manager.isOnlyAddAuth) {
+        [self onAuth:call result:result];
     } else {
-        if (onlyAdd) {
+        if (ignoreCheckPermission) {
+            [self onAuth:call result:result];
+        } else {
+            if (onlyAdd) {
                 [self requestOnlyAddPermission:^(PHAuthorizationStatus status) {
                     BOOL auth = PHAuthorizationStatusAuthorized == status;
                     [manager setOnlyAddAuth:auth];
@@ -127,7 +134,6 @@
                     }
                 }];
             } else {
-                NSLog(@"Getting permissions");
                 [self requestPermissionForWriteAndRead:^(BOOL auth) {
                   [manager setAuth:auth];
                   if (auth) {
@@ -137,6 +143,7 @@
                   }
                 }];
             }
+        }
     }
 }
 
@@ -311,20 +318,17 @@
 
 - (void)handleMethodResult:(FlutterMethodCall *)call handler:(ResultHandler *)handler manager:(PMManager *)manager notificationManager:(PMNotificationManager *)notificationManager {
     if ([call.method isEqualToString:@"getAssetPathList"]) {
-        [self requestPermissionForWriteAndRead:^(BOOL auth) {
-                [manager setAuth:auth];
-                int type = [call.arguments[@"type"] intValue];
-                BOOL hasAll = [call.arguments[@"hasAll"] boolValue];
-                BOOL onlyAll = [call.arguments[@"onlyAll"] boolValue];
-                NSObject <PMBaseFilter> *option =
-                    [PMConvertUtils convertMapToOptionContainer:call.arguments[@"option"]];
+        int type = [call.arguments[@"type"] intValue];
+        BOOL hasAll = [call.arguments[@"hasAll"] boolValue];
+        BOOL onlyAll = [call.arguments[@"onlyAll"] boolValue];
+        NSObject <PMBaseFilter> *option =
+            [PMConvertUtils convertMapToOptionContainer:call.arguments[@"option"]];
 
-                PMPathFilterOption *pathFilterOption = [PMPathFilterOption optionWithDict:call.arguments[@"pathOption"]];
+        PMPathFilterOption *pathFilterOption = [PMPathFilterOption optionWithDict:call.arguments[@"pathOption"]];
 
-                NSArray<PMAssetPathEntity *> *array = [manager getAssetPathList:type hasAll:hasAll onlyAll:onlyAll option:option pathFilterOption:pathFilterOption];
-                NSDictionary *dictionary = [PMConvertUtils convertPathToMap:array];
-                [handler reply:dictionary];
-                }];
+        NSArray<PMAssetPathEntity *> *array = [manager getAssetPathList:type hasAll:hasAll onlyAll:onlyAll option:option pathFilterOption:pathFilterOption];
+        NSDictionary *dictionary = [PMConvertUtils convertPathToMap:array];
+        [handler reply:dictionary];
     } else if ([call.method isEqualToString:@"getAssetCountFromPath"]) {
         NSString *id = call.arguments[@"id"];
         int requestType = [call.arguments[@"type"] intValue];
